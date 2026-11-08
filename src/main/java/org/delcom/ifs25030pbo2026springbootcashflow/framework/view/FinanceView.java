@@ -1,5 +1,6 @@
 package org.delcom.ifs25030pbo2026springbootcashflow.framework.view;
 
+import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -11,6 +12,7 @@ import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
+import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.select.Select;
@@ -22,7 +24,6 @@ import org.delcom.ifs25030pbo2026springbootcashflow.adapter.presenter.FinancePre
 import org.delcom.ifs25030pbo2026springbootcashflow.domain.entity.SortOption;
 import org.delcom.ifs25030pbo2026springbootcashflow.domain.entity.Transaction;
 import org.delcom.ifs25030pbo2026springbootcashflow.domain.entity.TransactionType;
-import org.delcom.ifs25030pbo2026springbootcashflow.domain.exception.DomainException;
 import org.delcom.ifs25030pbo2026springbootcashflow.domain.exception.EntityNotFoundException;
 import org.delcom.ifs25030pbo2026springbootcashflow.domain.exception.ValidationException;
 import org.delcom.ifs25030pbo2026springbootcashflow.usecase.FinanceUseCase;
@@ -58,6 +59,9 @@ public class FinanceView extends VerticalLayout {
         setPadding(true);
         setSpacing(true);
 
+        // Aksesibilitas: seluruh konten berada dalam landmark utama (aturan axe "region" / "landmark-one-main")
+        getElement().setAttribute("role", "main");
+
         configureGrid();
         configureToolbar();
 
@@ -65,38 +69,47 @@ public class FinanceView extends VerticalLayout {
         refreshAll();
     }
 
+    @Override
+    protected void onAttach(AttachEvent attachEvent) {
+        super.onAttach(attachEvent);
+        // Aksesibilitas / SEO: deklarasikan bahasa halaman (aturan "html-has-lang")
+        attachEvent.getUI().getPage().executeJs("document.documentElement.lang = 'id';");
+    }
+
     // ------------------------------------------------------------ ringkasan
     private HorizontalLayout buildSummaryCards() {
+        // Teks memakai warna gelap agar rasio kontras terhadap latar >= 4.5:1 (WCAG AA)
         HorizontalLayout summary = new HorizontalLayout(
-                createSummaryCard("Total Transaksi", totalCount, "#DBEAFE", "#1D4ED8", "#1E40AF"),
-                createSummaryCard("Total Pemasukan", incomeTotal, "#DCFCE7", "#16A34A", "#166534"),
-                createSummaryCard("Total Pengeluaran", expenseTotal, "#FEE2E2", "#DC2626", "#991B1B"),
-                createSummaryCard("Saldo", balanceLabel, "#FEF3C7", "#D97706", "#92400E")
+                createSummaryCard("Total Transaksi", totalCount, "#DBEAFE", "#1D4ED8", "#1E3A8A"),
+                createSummaryCard("Total Pemasukan", incomeTotal, "#DCFCE7", "#16A34A", "#14532D"),
+                createSummaryCard("Total Pengeluaran", expenseTotal, "#FEE2E2", "#DC2626", "#7F1D1D"),
+                createSummaryCard("Saldo", balanceLabel, "#FEF3C7", "#D97706", "#78350F")
         );
         summary.setWidthFull();
+        summary.setWrap(true);
         summary.setSpacing(true);
         summary.getStyle().set("align-items", "stretch");
         return summary;
     }
 
-    private Div createSummaryCard(String label, Span value, String background, String accent, String valueColor) {
+    private Div createSummaryCard(String label, Span value, String background, String accent, String textColor) {
         Span caption = new Span(label);
         caption.getStyle()
                 .set("display", "block")
                 .set("font-size", "0.875rem")
-                .set("font-weight", "500")
-                .set("color", accent);
+                .set("font-weight", "600")
+                .set("color", textColor);
 
         value.getStyle()
                 .set("display", "block")
                 .set("margin-top", "0.35rem")
                 .set("font-size", "1.5rem")
                 .set("font-weight", "700")
-                .set("color", valueColor);
+                .set("color", textColor);
 
         Div card = new Div(caption, value);
         card.getStyle()
-                .set("flex", "1")
+                .set("flex", "1 1 11rem")
                 .set("min-width", "0")
                 .set("background", background)
                 .set("border", "1px solid " + accent)
@@ -151,6 +164,8 @@ public class FinanceView extends VerticalLayout {
                 .setSortable(false);
 
         grid.setEmptyStateComponent(emptyState);
+        grid.getElement().setAttribute("aria-label", "Daftar transaksi");
+        grid.setMinHeight("20rem");
         grid.setSizeFull();
     }
 
@@ -158,16 +173,21 @@ public class FinanceView extends VerticalLayout {
         Button deleteButton = new Button("Hapus", VaadinIcon.TRASH.create(),
                 event -> openDeleteDialog(transaction));
         deleteButton.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY_INLINE);
+        deleteButton.getElement().setAttribute("aria-label",
+                "Hapus transaksi " + transaction.getId() + ": " + transaction.getDescription());
         return new HorizontalLayout(deleteButton);
     }
 
     // -------------------------------------------------------------- toolbar
     private void configureToolbar() {
+        searchField.setLabel("Cari keterangan");
         searchField.setPlaceholder("Cari keterangan...");
+        searchField.setMinWidth("12rem");
         searchField.setPrefixComponent(VaadinIcon.SEARCH.create());
         searchField.setClearButtonVisible(true);
 
-        sortSelect.setPlaceholder("Urutkan...");
+        sortSelect.setLabel("Urutkan");
+        sortSelect.setPlaceholder("Pilih urutan...");
         sortSelect.setItems(SortOption.values());
         sortSelect.setItemLabelGenerator(presenter::formatSortOption);
         sortSelect.addValueChangeListener(event -> {
@@ -192,6 +212,8 @@ public class FinanceView extends VerticalLayout {
         HorizontalLayout toolbar = new HorizontalLayout(
                 searchField, searchButton, sortSelect, refreshButton, incomeButton, expenseButton);
         toolbar.setWidthFull();
+        toolbar.setWrap(true);
+        toolbar.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.END);
         toolbar.setFlexGrow(1, searchField);
         return toolbar;
     }
@@ -281,7 +303,7 @@ public class FinanceView extends VerticalLayout {
             showError(presenter.showRemoveFailed(ex.getId()));
         } catch (ValidationException ex) {
             showError(presenter.showValidationError(ex.getMessage()));
-        } 
+        }
     }
 
     // ------------------------------------------------------------ notifikasi
